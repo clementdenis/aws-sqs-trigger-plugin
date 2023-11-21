@@ -54,12 +54,12 @@ public class SqsTriggerApiTest {
             Jenkins jenkins = r.getInstance();
             SqsPollTask sqsPollTask = jenkins.getExtensionList(SqsPollTask.class).get(0);
             SqsPoller mockSqsPoller = mock(SqsPoller.class);
-            when(mockSqsPoller.getMessagesAndDelete(any(String.class), any()))
+            when(mockSqsPoller.getMessagesAndDelete(any(String.class), any(), 20))
                     .thenReturn(Collections.emptyList());
             sqsPollTask.setSqsPoller(mockSqsPoller);
             await().atMost(60, SECONDS).untilAsserted(() -> {
                 ArgumentCaptor<AWSCredentials> captorAWSCredentials = ArgumentCaptor.forClass(AWSCredentials.class);
-                verify(mockSqsPoller).getMessagesAndDelete(eq("test-queue-url"), captorAWSCredentials.capture());
+                verify(mockSqsPoller).getMessagesAndDelete(eq("test-queue-url"), captorAWSCredentials.capture(), 20);
                 AWSCredentials capturedAWSCredentials = captorAWSCredentials.getValue();
                 assertThat(capturedAWSCredentials.getAWSAccessKeyId()).isEqualTo(accessKey);
                 assertThat(capturedAWSCredentials.getAWSSecretKey()).isEqualTo(secretKey);

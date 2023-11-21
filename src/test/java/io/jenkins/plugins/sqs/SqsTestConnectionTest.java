@@ -7,7 +7,6 @@ import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
 import com.gargoylesoftware.htmlunit.html.*;
 import hudson.model.FreeStyleProject;
-import jenkins.model.Jenkins;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,7 +49,7 @@ public class SqsTestConnectionTest {
 
         sessions.then(r -> {
             SqsPoller mockSqsPoller = mock(SqsPoller.class);
-            when(mockSqsPoller.getMessagesAndDelete(any(String.class), any()))
+            when(mockSqsPoller.getMessagesAndDelete(any(String.class), any(), 20))
                     .thenReturn(Collections.emptyList());
             SqsTrigger.SqsTriggerDescriptor sqsTriggerDescriptor=r.getInstance().getExtensionList(SqsTrigger.SqsTriggerDescriptor.class).get(0);
             sqsTriggerDescriptor.setSqsPoller(mockSqsPoller);

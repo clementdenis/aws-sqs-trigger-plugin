@@ -8,5 +8,5 @@ import java.util.List;
 public interface SqsPoller {
     void testConnection(String queueUrl, AWSCredentials credentialsId);
 
-    List<Message> getMessagesAndDelete(String queueUrl, AWSCredentials awsCredentials);
+    List<Message> getMessagesAndDelete(String queueUrl, AWSCredentials awsCredentials, int waitTimeSeconds);
 }

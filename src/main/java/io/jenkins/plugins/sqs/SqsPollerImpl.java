@@ -32,12 +32,12 @@ public class SqsPollerImpl implements SqsPoller {
 
     @Override
 
-    public List<Message> getMessagesAndDelete(String queueUrl, AWSCredentials awsCredentials) {
+    public List<Message> getMessagesAndDelete(String queueUrl, AWSCredentials awsCredentials, int waitTimeSeconds) {
         try {
             AmazonSQS sqs = createSQSClient(queueUrl, awsCredentials);
 
 
-            List<Message> messages = receiveMessages(queueUrl, sqs, 20);
+            List<Message> messages = receiveMessages(queueUrl, sqs, waitTimeSeconds);
 
             if (messages.size() > 0) {
                 deleteMessages(queueUrl, sqs, messages);
