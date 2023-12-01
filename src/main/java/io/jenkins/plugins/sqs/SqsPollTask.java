@@ -13,6 +13,7 @@ import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -42,18 +43,22 @@ public class SqsPollTask extends AsyncPeriodicWork {
         long startedAt = System.currentTimeMillis();
         IntSupplier remainingSeconds = () -> RECURRENCE_PERIOD_SECONDS - (int) (System.currentTimeMillis() - startedAt) / 1000;
 
-        List<SqsTrigger> triggers = AllTriggers.INSTANCE.getAll();
+        Collection<SqsTrigger> triggers = AllTriggers.INSTANCE.getAll();
         log.fine(() -> "Found " + triggers.size() + " SQS triggers.");
 
         ExecutorService executorService = Executors.newFixedThreadPool(triggers.size());
         try {
             triggers.forEach(trigger -> executorService.submit(() -> {
-                while (remainingSeconds.getAsInt() > 5) {
-                    String credentialsId = trigger.getSqsTriggerCredentialsId();
-                    AWSCredentials awsCredentials = AwsCredentialsHelper.getAWSCredentials((credentialsId));
-                    int waitTimeSeconds = Math.min(20, remainingSeconds.getAsInt());
-                    List<Message> messages = sqsPoller.getMessagesAndDelete(trigger.getSqsTriggerQueueUrl(), awsCredentials, waitTimeSeconds);
-                    trigger.buildJob(messages);
+                try {
+                    while (remainingSeconds.getAsInt() > 5) {
+                        String credentialsId = trigger.getSqsTriggerCredentialsId();
+                        AWSCredentials awsCredentials = AwsCredentialsHelper.getAWSCredentials((credentialsId));
+                        int waitTimeSeconds = Math.min(20, remainingSeconds.getAsInt());
+                        List<Message> messages = sqsPoller.getMessagesAndDelete(trigger.getSqsTriggerQueueUrl(), awsCredentials, waitTimeSeconds);
+                        trigger.buildJob(messages);
+                    }
+                } catch (Exception e) {
+                    log.severe("Failed to ");
                 }
             }));
         } finally {

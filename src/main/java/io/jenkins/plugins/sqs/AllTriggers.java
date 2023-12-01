@@ -1,8 +1,11 @@
 package io.jenkins.plugins.sqs;
 
+import hudson.util.CopyOnWriteMap;
 import lombok.extern.java.Log;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Log
@@ -13,20 +16,20 @@ public class AllTriggers {
     private AllTriggers() {
     }
 
-    private List<SqsTrigger> triggerList = new CopyOnWriteArrayList();
+    private final Map<String, SqsTrigger> triggerList = new CopyOnWriteMap.Hash<>();
 
     public void add(SqsTrigger trigger) {
         log.fine(() -> "Add SQS trigger, url: " + trigger.getSqsTriggerQueueUrl() + " job: " + trigger.getJobFullName() + ".");
-        triggerList.add(trigger);
+        triggerList.put(trigger.getSqsTriggerQueueUrl(), trigger);
     }
 
     public void remove(SqsTrigger trigger) {
         log.fine(() -> "Remove SQS trigger, url: " + trigger.getSqsTriggerQueueUrl() + " job: " + trigger.getJobFullName() + ".");
-        triggerList.remove(trigger);
+        triggerList.remove(trigger.getSqsTriggerQueueUrl());
     }
 
-    public List<SqsTrigger> getAll() {
-        return triggerList;
+    public Collection<SqsTrigger> getAll() {
+        return triggerList.values();
     }
 
 }

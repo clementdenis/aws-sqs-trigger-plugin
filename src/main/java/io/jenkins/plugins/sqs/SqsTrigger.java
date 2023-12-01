@@ -80,7 +80,7 @@ public class SqsTrigger extends Trigger<Job<?, ?>> {
     }
 
     private void buildOne(Message message) {
-        log.fine(() -> "Build triggered by " + message.getMessageId() + ".");
+        log.fine(() -> "Build triggered by " + message.getMessageId() + " on job " + getJobFullName() +  ".");
         List<ParameterValue> parameters = message
                 .getMessageAttributes()
                 .entrySet()
