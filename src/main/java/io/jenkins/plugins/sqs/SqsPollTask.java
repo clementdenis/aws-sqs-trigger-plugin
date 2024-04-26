@@ -2,12 +2,10 @@ package io.jenkins.plugins.sqs;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.model.Message;
-import com.google.common.base.Stopwatch;
 import hudson.Extension;
 import hudson.model.AsyncPeriodicWork;
 import hudson.model.TaskListener;
 import lombok.extern.java.Log;
-import org.apache.commons.lang.time.StopWatch;
 import org.jenkinsci.Symbol;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
@@ -15,13 +13,11 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntSupplier;
-import java.util.stream.Collectors;
+import java.util.logging.Level;
 
 
 @Extension
@@ -30,7 +26,8 @@ import java.util.stream.Collectors;
 @Log
 public class SqsPollTask extends AsyncPeriodicWork {
 
-    public static final int RECURRENCE_PERIOD_SECONDS = 600;
+    private static final int RECURRENCE_PERIOD_SECONDS = 600;
+    private static final SleepingErrorCounter ERROR_COUNTER = new SleepingErrorCounter();
 
     private transient SqsPoller sqsPoller = new SqsPollerImpl();
 
@@ -54,11 +51,23 @@ public class SqsPollTask extends AsyncPeriodicWork {
                         String credentialsId = trigger.getSqsTriggerCredentialsId();
                         AWSCredentials awsCredentials = AwsCredentialsHelper.getAWSCredentials((credentialsId));
                         int waitTimeSeconds = Math.min(20, remainingSeconds.getAsInt());
-                        List<Message> messages = sqsPoller.getMessagesAndDelete(trigger.getSqsTriggerQueueUrl(), awsCredentials, waitTimeSeconds);
-                        trigger.buildJob(messages);
+                        List<Message> messages = sqsPoller.getMessagesAndDelete(trigger.getSqsTriggerQueueUrl(),
+                                awsCredentials, waitTimeSeconds);
+                        if (messages == null) {
+                            log.info("Could not get messages for queue " + trigger.getSqsTriggerQueueUrl() + ", deregistering");
+                            AllTriggers.INSTANCE.remove(trigger);
+                        } else {
+                            trigger.buildJob(messages);
+                            ERROR_COUNTER.reset(trigger.getSqsTriggerQueueUrl());
+                        }
                     }
                 } catch (Exception e) {
-                    log.severe("Failed to ");
+                    if (ERROR_COUNTER.tooManyErrors(trigger.getSqsTriggerQueueUrl())) {
+                        log.log(Level.SEVERE, "Failed to launch job from message on queue " + trigger.getSqsTriggerQueueUrl(), e);
+                        AllTriggers.INSTANCE.remove(trigger);
+                    } else {
+                        log.log(Level.WARNING, "Failed to launch job from message on queue " + trigger.getSqsTriggerQueueUrl(), e);
+                    }
                 }
             }));
         } finally {

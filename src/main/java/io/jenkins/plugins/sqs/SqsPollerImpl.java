@@ -8,6 +8,7 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
 import com.amazonaws.services.sqs.model.Message;
+import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import jenkins.model.Jenkins;
@@ -24,30 +25,42 @@ import java.util.stream.Collectors;
 
 @Log
 public class SqsPollerImpl implements SqsPoller {
+
+    private static final SleepingErrorCounter ERROR_COUNTER = new SleepingErrorCounter();
+
     @Override
     public void testConnection(String queueUrl, AWSCredentials credentialsId) {
         AmazonSQS sqs = createSQSClient(queueUrl, credentialsId);
         receiveMessages(queueUrl, sqs, 0);
     }
 
+    /**
+     *
+     * @return the messages, or null if queue should be deregistered
+     */
     @Override
-
     public List<Message> getMessagesAndDelete(String queueUrl, AWSCredentials awsCredentials, int waitTimeSeconds) {
         try {
             AmazonSQS sqs = createSQSClient(queueUrl, awsCredentials);
 
-
             List<Message> messages = receiveMessages(queueUrl, sqs, waitTimeSeconds);
 
-            if (messages.size() > 0) {
+            if (!messages.isEmpty()) {
                 deleteMessages(queueUrl, sqs, messages);
             }
 
+            ERROR_COUNTER.reset(queueUrl);
             return messages;
+        } catch (QueueDoesNotExistException e) {
+            log.log(Level.WARNING, "Queue " + queueUrl + " does not exist anymore.", e);
+            return null;
         } catch (Exception e) {
-            log.log(Level.WARNING, e, () ->
-                    "Error to retrieve messages from " + queueUrl + "."
-            );
+            String message = "Unexpected error retrieving messages from " + queueUrl + ".";
+            if (ERROR_COUNTER.tooManyErrors(queueUrl)) {
+                log.log(Level.WARNING, message, e);
+                return null;
+            }
+            log.log(Level.FINE, message, e);
             return Collections.emptyList();
         }
     }
